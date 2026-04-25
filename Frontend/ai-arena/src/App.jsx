@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-
+import axios from 'axios';
 const MOCK_DATA = {
   problem: "Explain me what is JSONwebToken",
   solutions: [
@@ -28,18 +28,12 @@ const MOCK_DATA = {
   }
 };
 
-const PAST_CHATS = [
-  { id: 1, title: "What is JSON Web Token?" },
-  { id: 2, title: "Implement Binary Search in Python" },
-  { id: 3, title: "Rust Concurrent Hash Map" },
-  { id: 4, title: "Next.js App Router Architecture" }
-];
 
 const MarkdownComponents = {
-  p: ({node, ...props}) => <p className="mb-4 text-on-surface-variant text-sm leading-relaxed" {...props} />,
-  h3: ({node, ...props}) => <h3 className="text-md font-bold text-on-surface mt-6 mb-3" {...props} />,
-  li: ({node, ...props}) => <li className="text-on-surface-variant text-sm leading-relaxed ml-4 list-disc" {...props} />,
-  code: ({node, inline, className, children, ...props}) => {
+  p: ({ node, ...props }) => <p className="mb-4 text-on-surface-variant text-sm leading-relaxed" {...props} />,
+  h3: ({ node, ...props }) => <h3 className="text-md font-bold text-on-surface mt-6 mb-3" {...props} />,
+  li: ({ node, ...props }) => <li className="text-on-surface-variant text-sm leading-relaxed ml-4 list-disc" {...props} />,
+  code: ({ node, inline, className, children, ...props }) => {
     return !inline ? (
       <pre className="font-mono text-sm leading-relaxed text-on-surface bg-surface-container-low/50 p-4 rounded-lg overflow-x-auto border border-outline-variant/10 mb-4">
         <code {...props}>{children}</code>
@@ -50,26 +44,84 @@ const MarkdownComponents = {
       </code>
     );
   },
-  em: ({node, ...props}) => <em className="text-on-surface-variant italic" {...props} />,
-  strong: ({node, ...props}) => <strong className="font-bold text-on-surface" {...props} />,
-  hr: ({node, ...props}) => <hr className="my-6 border-t border-outline-variant/20" {...props} />
+  em: ({ node, ...props }) => <em className="text-on-surface-variant italic" {...props} />,
+  strong: ({ node, ...props }) => <strong className="font-bold text-on-surface" {...props} />,
+  hr: ({ node, ...props }) => <hr className="my-6 border-t border-outline-variant/20" {...props} />
 };
 
 const App = () => {
+  const [pastChats, setPastChats] = useState([]);
+  const [arenaData, setArenaData] = useState(null);
   const [query, setQuery] = useState('');
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!query.trim()) return;
-    
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+
+    try {
+      setIsLoading(true);
+
+      const response = await axios.post('http://localhost:3000/invoke', {
+        query: query
+      });
+
+
+
+      const res = response.data.data;
+
+      const formattedData = {
+        problem: res.problem,
+        solutions: [
+          {
+            id: "solution_1",
+            content: res.solution_1
+          },
+          {
+            id: "solution_2",
+            content: res.solution_2
+          }
+        ],
+        judge: {
+          scores: {
+            solution_1: res.judge.solution_1_score,
+            solution_2: res.judge.solution_2_score
+          },
+          reasoning: {
+            solution_1: res.judge.solution_1_reasoning,
+            solution_2: res.judge.solution_2_reasoning
+          },
+          recommended_solution:
+            res.judge.solution_1_score >= res.judge.solution_2_score
+              ? "solution_1"
+              : "solution_2"
+        }
+      };
+
+      setArenaData(formattedData);
       setHasSubmitted(true);
-    }, 1000);
+
+
+      setPastChats(prev => [
+        {
+          id: Date.now(),
+          title: query
+        },
+        ...prev
+      ]);
+
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadChat = (chat) => {
+    setQuery(chat.title);
+    setHasSubmitted(true);
   };
 
   const handleNewChat = () => {
@@ -83,8 +135,8 @@ const App = () => {
       {/* Top Navbar */}
       <nav className="h-16 border-b border-outline-variant/10 flex items-center justify-between px-6 bg-surface-container-lowest z-30 shrink-0 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
         <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="p-2 hover:bg-surface-container-low rounded-md transition-colors text-on-surface-variant"
             title="Toggle Sidebar"
           >
@@ -92,17 +144,17 @@ const App = () => {
           </button>
           <div className="font-bold text-lg tracking-tight text-primary">AI Arena</div>
         </div>
-        
+
         <div className="flex items-center gap-2">
-          <button 
-            onClick={handleNewChat} 
+          <button
+            onClick={handleNewChat}
             className="flex items-center gap-2 hover:bg-surface-container-low px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
           >
             <span className="material-symbols-outlined text-[18px]">add</span>
             <span className="hidden sm:inline">Arena</span>
           </button>
-          <button 
-            onClick={() => setIsSidebarOpen(true)} 
+          <button
+            onClick={() => setIsSidebarOpen(true)}
             className="flex items-center gap-2 hover:bg-surface-container-low px-4 py-2 rounded-lg text-sm transition-colors text-on-surface-variant"
           >
             <span className="material-symbols-outlined text-[18px]">history</span>
@@ -113,12 +165,12 @@ const App = () => {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside 
+        <aside
           className={`${isSidebarOpen ? 'w-64 border-r border-outline-variant/10' : 'w-0'} 
             hidden md:flex flex-col bg-surface-container-lowest/80 backdrop-blur transition-all duration-300 ease-in-out shrink-0 overflow-hidden`}
         >
           <div className="p-4">
-            <button 
+            <button
               onClick={handleNewChat}
               className="w-full flex items-center gap-2 bg-surface hover:bg-surface-container px-3 py-2.5 rounded-lg text-sm font-medium border border-outline-variant/20 transition-all shadow-sm"
             >
@@ -126,15 +178,16 @@ const App = () => {
               New Battle
             </button>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto px-2 pb-4">
             <div className="px-3 pt-6 pb-2 text-[10px] font-bold text-on-surface-variant tracking-wider uppercase">
               Previous Battles
             </div>
             <div className="space-y-1">
-              {PAST_CHATS.map(chat => (
-                <button 
-                  key={chat.id} 
+              {pastChats.map(chat => (
+                <button
+                  key={chat.id}
+                  onClick={() => loadChat(chat)}
                   className="w-full text-left px-3 py-2 text-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-md truncate transition-colors flex items-center gap-3 group"
                 >
                   <span className="material-symbols-outlined text-[16px] opacity-70 group-hover:opacity-100">chat_bubble</span>
@@ -148,7 +201,7 @@ const App = () => {
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col relative overflow-y-auto bg-surface">
           <div className="w-full max-w-[1240px] mx-auto px-6 py-12 pb-32">
-            
+
             {/* Input Section (Centered when new, top when submitted) */}
             <section className={`flex justify-center transition-all duration-700 ease-in-out ${hasSubmitted ? 'mb-16' : 'mt-[25vh]'}`}>
               <div className="w-full max-w-3xl">
@@ -160,15 +213,15 @@ const App = () => {
                     <div className="pl-4 text-on-surface-variant/40">
                       <span className="material-symbols-outlined">psychology</span>
                     </div>
-                    <input 
+                    <input
                       className={`w-full bg-transparent border-none focus:ring-0 outline-none text-on-surface font-['Inter'] placeholder-on-surface-variant/40 ${hasSubmitted ? 'px-4 py-3 text-sm' : 'px-4 py-4 text-lg'}`}
-                      placeholder="Ask anything or provide a coding problem..." 
-                      type="text" 
+                      placeholder="Ask anything or provide a coding problem..."
+                      type="text"
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       disabled={isLoading}
                     />
-                    <button 
+                    <button
                       type="submit"
                       disabled={isLoading}
                       className="bg-on-surface hover:bg-primary-dim text-surface font-bold px-6 py-3 rounded-xl transition-all duration-200 flex items-center gap-2 cursor-pointer disabled:opacity-50"
@@ -185,30 +238,30 @@ const App = () => {
             {hasSubmitted && !isLoading && (
               <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
                 <section className="mb-10 text-center">
-                   <h2 className="text-2xl font-bold tracking-tight">{query || MOCK_DATA.problem}</h2>
+                  <h2 className="text-2xl font-bold tracking-tight">{arenaData?.problem || query}</h2>
                 </section>
 
                 {/* Solution Grid (2 Columns) */}
                 <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
-                  {MOCK_DATA.solutions.map((solution, index) => (
+                  {arenaData?.solutions?.map((solution, index) => (
                     <div key={solution.id} className="flex flex-col gap-4">
                       <div className="flex items-center gap-3">
                         <span className="text-xs font-bold tracking-widest text-on-surface-variant uppercase">Solution {index + 1}</span>
                         <span className="h-px flex-1 bg-outline-variant/20"></span>
                       </div>
                       <div className="bg-surface-container-lowest p-6 pt-2 rounded-2xl shadow-sm border border-outline-variant/10 h-full relative group">
-                        {MOCK_DATA.judge.recommended_solution === solution.id && (
+                        {arenaData?.judge?.recommended_solution === solution.id && (
                           <div className="absolute top-0 right-6 -translate-y-1/2">
                             <span className="bg-green-100 text-green-800 border border-green-200 text-[9px] font-black tracking-widest px-3 py-1 rounded-full shadow-sm flex items-center gap-1 uppercase">
-                              <span className="material-symbols-outlined text-[10px]" style={{fontVariationSettings: "'FILL' 1"}}>check_circle</span>
+                              <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                               Recommended
                             </span>
                           </div>
                         )}
                         <div className="overflow-y-auto max-h-[60vh] custom-scroll pt-6">
-                            <ReactMarkdown components={MarkdownComponents}>
-                              {solution.content}
-                            </ReactMarkdown>
+                          <ReactMarkdown components={MarkdownComponents}>
+                            {solution.content}
+                          </ReactMarkdown>
                         </div>
                       </div>
                     </div>
@@ -222,45 +275,45 @@ const App = () => {
                       <div className="flex flex-col gap-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                             <span className="material-symbols-outlined text-on-primary text-sm" style={{fontVariationSettings: "'FILL' 1"}}>gavel</span>
+                            <span className="material-symbols-outlined text-on-primary text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>gavel</span>
                           </div>
                           <h2 className="text-2xl font-extrabold tracking-tight text-on-surface">Judge Assessment</h2>
                         </div>
                         <p className="text-on-surface-variant text-sm ml-11">Evaluated based on correctness, clarity, and security best practices.</p>
                       </div>
-                      
+
                       {/* Scores */}
                       <div className="flex items-center gap-6 md:pr-10">
                         <div className="text-center">
-                          <div className="text-4xl font-black text-on-surface-variant/60">{MOCK_DATA.judge.scores.solution_1}<span className="text-lg text-on-surface-variant/40">/10</span></div>
+                          <div className="text-4xl font-black text-on-surface-variant/60">{arenaData?.judge?.scores?.solution_1}<span className="text-lg text-on-surface-variant/40">/10</span></div>
                           <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mt-2 border-t border-outline-variant/20 pt-2">Sol 1</div>
                         </div>
                         <div className="h-12 w-px bg-outline-variant/30"></div>
                         <div className="text-center">
-                          <div className="text-4xl font-black text-on-surface">{MOCK_DATA.judge.scores.solution_2}<span className="text-lg text-on-surface-variant/40">/10</span></div>
+                          <div className="text-4xl font-black text-on-surface">{arenaData?.judge?.scores?.solution_2}<span className="text-lg text-on-surface-variant/40">/10</span></div>
                           <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface mt-2 border-t border-outline-variant/20 pt-2 text-primary">Sol 2</div>
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Reasoning Details */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16">
                       <div>
                         <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4 flex items-center gap-2">
-                           <span className="material-symbols-outlined text-sm">comment</span>
-                           Solution 1 Feedback
+                          <span className="material-symbols-outlined text-sm">comment</span>
+                          Solution 1 Feedback
                         </h3>
                         <p className="text-md text-on-surface-variant leading-relaxed">
-                          {MOCK_DATA.judge.reasoning.solution_1}
+                          {arenaData?.judge?.reasoning?.solution_1}
                         </p>
                       </div>
                       <div>
-                         <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4 flex items-center gap-2">
-                           <span className="material-symbols-outlined text-sm">comment</span>
-                           Solution 2 Feedback
+                        <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4 flex items-center gap-2">
+                          <span className="material-symbols-outlined text-sm">comment</span>
+                          Solution 2 Feedback
                         </h3>
                         <p className="text-md text-on-surface-variant leading-relaxed">
-                          {MOCK_DATA.judge.reasoning.solution_2}
+                          {arenaData?.judge?.reasoning?.solution_2}
                         </p>
                       </div>
                     </div>
